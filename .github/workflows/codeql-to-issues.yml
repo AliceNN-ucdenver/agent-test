@@ -1,0 +1,118 @@
+name: "CodeQL to Security Issues"
+
+on:
+  workflow_run:
+    workflows: ["CodeQL Security Analysis"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      severity_threshold:
+        description: 'Minimum severity to create issues (critical, high, medium, low)'
+        required: false
+        default: 'high'
+      max_issues_per_run:
+        description: 'Maximum number of issues to create per run'
+        required: false
+        default: '10'
+
+jobs:
+  create-issues:
+    name: Create Security Issues
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      issues: write
+      security-events: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      run: |
+        npm install --no-save @octokit/rest axios
+      working-directory: .
+
+    - name: Download CodeQL SARIF
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: ${{ github.event.workflow_run.id || github.run_id }},
+          });
+
+          const sarifArtifact = artifacts.data.artifacts.find(
+            artifact => artifact.name === 'codeql-sarif'
+          );
+
+          if (!sarifArtifact) {
+            core.setFailed('SARIF artifact not found');
+            return;
+          }
+
+          const download = await github.rest.actions.downloadArtifact({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            artifact_id: sarifArtifact.id,
+            archive_format: 'zip',
+          });
+
+          const fs = require('fs');
+          fs.writeFileSync('sarif-results.zip', Buffer.from(download.data));
+
+    - name: Extract SARIF
+      run: |
+        unzip -o sarif-results.zip
+        # CodeQL creates language-specific SARIF files (javascript.sarif, etc.)
+        # Find and rename to codeql-results.sarif
+        SARIF_FILE=$(ls *.sarif | head -1)
+        if [ -n "$SARIF_FILE" ]; then
+          mv "$SARIF_FILE" codeql-results.sarif
+          echo "Using SARIF file: $SARIF_FILE"
+        else
+          echo "Error: No SARIF file found after extraction"
+          exit 1
+        fi
+        ls -la codeql-results.sarif
+
+    - name: Process CodeQL Results
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+        GITHUB_SHA: ${{ github.sha }}
+        SARIF_PATH: 'codeql-results.sarif'
+        SEVERITY_THRESHOLD: ${{ github.event.inputs.severity_threshold || 'high' }}
+        MAX_ISSUES_PER_RUN: ${{ github.event.inputs.max_issues_per_run || '10' }}
+        ENABLE_MAINTAINABILITY: 'true'
+        ENABLE_THREAT_MODEL: 'true'
+        PROMPT_REPO: 'AliceNN-ucdenver/MaintainabilityAI'
+        PROMPT_BRANCH: 'main'
+      run: |
+        node automation/process-codeql-results.js
+
+    - name: Upload processing logs
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: codeql-processing-logs
+        path: automation/logs/
+        retention-days: 30
+
+    - name: Summary
+      if: always()
+      run: |
+        if [ -f "automation/logs/summary.json" ]; then
+          echo "## CodeQL Processing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          cat automation/logs/summary.json >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        fi

@@ -1,0 +1,36 @@
+{
+  "_metadata": {
+    "generated": "2025-10-15T20:11:34.696Z",
+    "generator": "generate-prompt-hashes.js",
+    "algorithm": "SHA-256"
+  },
+  "owasp": {
+    "A01_broken_access_control.md": "sha256:68206c1cc1d24d3e59e740793d9d275b841bd591241a4f720c5cc5fb2e38a919",
+    "A02_crypto_failures.md": "sha256:d4485b5171deaffb9c1a5df12e70705dff3f37fcac8e548730933f8d288da444",
+    "A03_injection.md": "sha256:d7219080e0c3549f2950de1867b4e492bd209190588df6201b852c5aa0c29e8d",
+    "A04_insecure_design.md": "sha256:67f6428eb796b59c87b166a45d04a614712268c909fdf906d7a7f95ee28f0bbd",
+    "A05_security_misconfig.md": "sha256:80e5e7165a8613c99189a8efe6a1865e13d448e54a22711d080ba2860fc3cf8b",
+    "A06_vuln_outdated.md": "sha256:62d81730c0a7847e0450db3cf22b971ab4b1cf257cbde763453efdf3d14d366f",
+    "A07_authn_failures.md": "sha256:4d17f3cd370e5d03ef5751fd4295221dd766262e74021b1fa3e73aad4e1459f3",
+    "A08_integrity_failures.md": "sha256:67890083309dfb588c54fca509b7777eb87d004e13e77d8da3a5e6e20fb7cd7d",
+    "A09_logging_monitoring.md": "sha256:3a24ca2d943d03a74d23d0f4d79da560c208b8821dfeb2fbb41e783da42057fb",
+    "A10_ssrf.md": "sha256:ee5f093ea2d5742cdc166295dc2c37b37c0c4f151017a5482352a57fc98cd86a"
+  },
+  "maintainability": {
+    "complexity-reduction.md": "sha256:141fb5bf4ad4ad81022fd81e5b8b2901cb425d35d3e024bee7e026706d635706",
+    "dependency-hygiene.md": "sha256:7bb2bae0f47bd7edac937f37b7b8b5c174fbcb9f7f82fcbca7e40bc0a601bccb",
+    "dry-principle.md": "sha256:d63c4fb09cfb6a83b1e949c3aa9711f8e998d5d2e448adaa0b34ab493c44784b",
+    "fitness-functions.md": "sha256:2edfecf009e4e605d04fc58493e63e661083fb9215eb9147cfb04e0729c3e637",
+    "single-responsibility.md": "sha256:9874e658c3a032f6e93c72ef1d63ef0c4abfecb0781ebca169bbb6b8e6285abf",
+    "strangler-fig.md": "sha256:00672050ab52f43a36907e679b6548ad8387dcbf251603a86c381dcc3a1fbeb5",
+    "technical-debt.md": "sha256:77aa998181a756f6198ebe64368330dc5fb6379c7c0022b05a2a369ca06e62b3"
+  },
+  "threat-modeling": {
+    "denial-of-service.md": "sha256:068f30632c9bc2b1f2fb742f6c141837d57103c06dae1c4495d45e4ff3390e69",
+    "elevation-of-privilege.md": "sha256:af61b19983121fc109ac4183e543dcab33c222ceb32493ae001efa9ecc2c598f",
+    "information-disclosure.md": "sha256:7a2852edcb52cf97d1ae7c0fd55c2746b2e262fdeb6d37c4fdf7a93cf1344d1d",
+    "repudiation.md": "sha256:9a8dd1d83bb3a382c33e797d3acc4a9ef095afd0d4e8d421fe6038c647a4509e",
+    "spoofing.md": "sha256:52c39b5ad84140df5a393f3e849031aee4da713690fa59697a9f3008029e17fa",
+    "tampering.md": "sha256:be82abb027ab4632fddf9df22e6402fb7cdc92f000848942e668c99229a2deac"
+  }
+}

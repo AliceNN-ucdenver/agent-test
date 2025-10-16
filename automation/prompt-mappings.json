@@ -1,0 +1,139 @@
+{
+  "codeql_to_owasp": {
+    "js/sql-injection": "A03_injection",
+    "js/xss": "A03_injection",
+    "js/xss-through-dom": "A03_injection",
+    "js/path-injection": "A01_broken_access_control",
+    "js/path-traversal": "A01_broken_access_control",
+    "js/weak-cryptography": "A02_crypto_failures",
+    "js/insufficient-crypto": "A02_crypto_failures",
+    "js/insufficient-password-hash": "A02_crypto_failures",
+    "js/hardcoded-credentials": "A07_authn_failures",
+    "js/hardcoded-data-interpreted-as-code": "A08_integrity_failures",
+    "js/missing-rate-limiting": "A04_insecure_design",
+    "js/log-injection": "A09_logging_monitoring",
+    "js/ssrf": "A10_ssrf",
+    "js/server-side-request-forgery": "A10_ssrf",
+    "js/command-injection": "A03_injection",
+    "js/code-injection": "A03_injection",
+    "js/unsafe-deserialization": "A08_integrity_failures",
+    "js/xml-bomb": "A04_insecure_design",
+    "js/xxe": "A05_security_misconfig",
+    "js/missing-authentication": "A07_authn_failures",
+    "js/broken-authentication": "A07_authn_failures",
+    "js/missing-authorization": "A01_broken_access_control",
+    "js/cors-misconfiguration": "A05_security_misconfig",
+    "js/insecure-dependency": "A06_vuln_outdated",
+    "js/prototype-pollution": "A08_integrity_failures",
+    "js/information-exposure": "A05_security_misconfig",
+    "js/sensitive-data-exposure": "A02_crypto_failures",
+    "js/insufficient-logging": "A09_logging_monitoring",
+    "js/request-forgery": "A01_broken_access_control",
+    "js/http-to-file-access": "A01_broken_access_control",
+    "js/file-access-to-http": "A05_security_misconfig"
+  },
+  "owasp_categories": {
+    "A01_broken_access_control": {
+      "name": "Broken Access Control",
+      "prompt_file": "A01_broken_access_control.md",
+      "threat_model": ["elevation-of-privilege", "information-disclosure"],
+      "maintainability": ["single-responsibility", "complexity-reduction"]
+    },
+    "A02_crypto_failures": {
+      "name": "Cryptographic Failures",
+      "prompt_file": "A02_crypto_failures.md",
+      "threat_model": ["information-disclosure", "tampering"],
+      "maintainability": []
+    },
+    "A03_injection": {
+      "name": "Injection",
+      "prompt_file": "A03_injection.md",
+      "threat_model": ["tampering", "elevation-of-privilege"],
+      "maintainability": ["complexity-reduction", "dry-principle"]
+    },
+    "A04_insecure_design": {
+      "name": "Insecure Design",
+      "prompt_file": "A04_insecure_design.md",
+      "threat_model": ["denial-of-service"],
+      "maintainability": ["fitness-functions", "technical-debt", "strangler-fig"]
+    },
+    "A05_security_misconfig": {
+      "name": "Security Misconfiguration",
+      "prompt_file": "A05_security_misconfig.md",
+      "threat_model": ["information-disclosure"],
+      "maintainability": []
+    },
+    "A06_vuln_outdated": {
+      "name": "Vulnerable and Outdated Components",
+      "prompt_file": "A06_vuln_outdated.md",
+      "threat_model": [],
+      "maintainability": ["dependency-hygiene", "fitness-functions", "technical-debt"]
+    },
+    "A07_authn_failures": {
+      "name": "Identification and Authentication Failures",
+      "prompt_file": "A07_authn_failures.md",
+      "threat_model": ["spoofing"],
+      "maintainability": ["dry-principle"]
+    },
+    "A08_integrity_failures": {
+      "name": "Software and Data Integrity Failures",
+      "prompt_file": "A08_integrity_failures.md",
+      "threat_model": ["tampering"],
+      "maintainability": []
+    },
+    "A09_logging_monitoring": {
+      "name": "Security Logging and Monitoring Failures",
+      "prompt_file": "A09_logging_monitoring.md",
+      "threat_model": ["repudiation"],
+      "maintainability": []
+    },
+    "A10_ssrf": {
+      "name": "Server-Side Request Forgery",
+      "prompt_file": "A10_ssrf.md",
+      "threat_model": ["tampering", "information-disclosure"],
+      "maintainability": []
+    }
+  },
+  "maintainability_triggers": {
+    "complexity": {
+      "prompt_file": "complexity-reduction.md",
+      "keywords": ["cyclomatic complexity", "nested", "long function", "too many branches"]
+    },
+    "duplication": {
+      "prompt_file": "dry-principle.md",
+      "keywords": ["duplicate code", "repeated pattern", "copy-paste"]
+    },
+    "responsibility": {
+      "prompt_file": "single-responsibility.md",
+      "keywords": ["large class", "god object", "multiple concerns"]
+    },
+    "dependencies": {
+      "prompt_file": "dependency-hygiene.md",
+      "keywords": ["outdated", "vulnerable dependency", "unmaintained package"]
+    },
+    "refactoring": {
+      "prompt_file": "strangler-fig.md",
+      "keywords": ["legacy code", "incremental refactoring", "large migration", "phased approach"]
+    },
+    "technical_debt": {
+      "prompt_file": "technical-debt.md",
+      "keywords": ["workaround", "temporary fix", "needs refactoring", "technical debt", "code smell"]
+    },
+    "quality_gates": {
+      "prompt_file": "fitness-functions.md",
+      "keywords": ["automated checks", "quality metrics", "ci/cd", "validation", "guardrails"]
+    }
+  },
+  "severity_mapping": {
+    "error": "critical",
+    "warning": "high",
+    "note": "medium",
+    "none": "low"
+  },
+  "label_mapping": {
+    "critical": "security/critical",
+    "high": "security/high",
+    "medium": "security/medium",
+    "low": "security/low"
+  }
+}

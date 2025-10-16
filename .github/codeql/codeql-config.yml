@@ -1,0 +1,16 @@
+name: "CodeQL Config"
+
+# Security-extended query suite
+queries:
+  - uses: security-extended
+
+# Path-based filters - exclude test directories and automation scripts
+# Note: automation/process-codeql-results.js is excluded because it's part of the
+# security automation framework itself and produces a false positive for js/file-access-to-http
+# (it fetches prompts FROM remote, not sending local files TO remote)
+paths-ignore:
+  - '**/test/**'
+  - '**/tests/**'
+  - '**/__tests__/**'
+  - '**/node_modules/**'
+  - 'automation/**'

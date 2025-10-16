@@ -1,0 +1,842 @@
+name: "Alice AI Remediation"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  # ============================================================================
+  # Phase 1: Analysis & Planning (Default - No "approved")
+  # ============================================================================
+  analyze-and-plan:
+    name: "Analysis & Planning"
+    runs-on: ubuntu-latest
+    # Trigger: @claude or @alice WITHOUT approval keywords
+    if: |
+      github.event.issue &&
+      (contains(github.event.comment.body, '@claude') || contains(github.event.comment.body, '@alice')) &&
+      !contains(github.event.comment.body, 'approved') &&
+      !contains(github.event.comment.body, 'go ahead') &&
+      !contains(github.event.comment.body, 'implement this') &&
+      !contains(github.event.comment.body, 'looks good') &&
+      contains(github.event.issue.labels.*.name, 'codeql-finding')
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Extract issue details
+      id: issue_details
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issue = context.payload.issue;
+          const comment = context.payload.comment;
+
+          // Extract issue number, title, body
+          core.setOutput('issue_number', issue.number);
+          core.setOutput('issue_title', issue.title);
+          core.setOutput('issue_body', issue.body);
+          core.setOutput('comment_body', comment.body);
+          core.setOutput('comment_user', comment.user.login);
+
+    - name: Claude Code Analysis & Planning
+      uses: anthropics/claude-code-action@v1
+      with:
+        anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        track_progress: true
+        prompt: |
+          # Security Vulnerability Analysis & Remediation Planning
+
+          ## Context
+
+          - **Repository**: ${{ github.repository }}
+          - **Issue**: #${{ steps.issue_details.outputs.issue_number }}
+          - **Requested by**: @${{ steps.issue_details.outputs.comment_user }}
+
+          ## Issue Details
+
+          ${{ steps.issue_details.outputs.issue_body }}
+
+          The issue above contains embedded guidance in collapsible sections:
+          - **📘 OWASP Security Guidance** — Compact remediation guides with vulnerable/secure TypeScript examples
+          - **🏗️ Maintainability Guidance** — Complexity reduction, DRY principle, etc.
+          - **🎯 Threat Model Analysis (STRIDE)** — Tampering, Information Disclosure, etc.
+
+          **IMPORTANT**: Expand and read these sections. They contain the security requirements for your fix.
+
+          ## Latest Comment
+
+          ${{ steps.issue_details.outputs.comment_body }}
+
+          ---
+
+          ## Your Task: Develop a Comprehensive Remediation Plan
+
+          You are a security-focused software engineer. Your job is to analyze this vulnerability and create a detailed remediation plan for human review. You will NOT implement the fix yet.
+
+          **IMPORTANT**: The issue may contain **multiple occurrences** of the same vulnerability in the same file (e.g., "3 occurrences"). Your remediation plan must address **ALL occurrences**, not just one.
+
+          ### Step 1: Read & Understand
+
+          1. **Identify all occurrences** in the issue
+             - Look for "Occurrences: X locations in this file" in the issue header
+             - Check for "Location 1:", "Location 2:", etc. sections with code snippets
+             - Note the line numbers for each occurrence
+          2. **Read the vulnerable code file** mentioned in the issue
+             - Navigate to each occurrence location
+             - Understand the context around each vulnerable line
+          3. **Expand and review the OWASP prompt** in the collapsed section (📘 OWASP Security Guidance)
+             - Look at "What It Looks Like" (vulnerable examples with ❌)
+             - Study "What Good Looks Like" (secure patterns with ✅ and 5 key patterns numbered 1-5)
+             - Note the "Human Review Checklist" at the end (6 items)
+          4. **Review related maintainability guidance** if present (🏗️ Maintainability Guidance)
+          5. **Understand the threat model** (🎯 Threat Model Analysis - STRIDE categories)
+
+          ### Step 2: Design Your Solution
+
+          Using the patterns from the embedded prompts as your specification:
+
+          #### Security Design Decisions (Checklist Items 1-3)
+
+          The OWASP prompt contains a "Human Review Checklist" with 6 items. For your plan, address the **FIRST THREE items** (these are design decisions):
+
+          **Example for OWASP A03 Injection:**
+          - Item 1: **Parameterized Queries** — Decide which library (pg, mysql2), confirm $1/$2 placeholders
+          - Item 2: **Input Validation** — Design Zod schema with allowlist regex, length limits
+          - Item 3: **No String Concatenation** — Confirm zero template literals in SQL
+
+          **Example for Complexity Reduction:**
+          - Item 1: **Cyclomatic Complexity** — Target complexity per function, which functions to extract
+          - Item 2: **Nesting Depth** — How to flatten using guard clauses
+          - Item 3: **Function Length** — Which functions to split, target line counts
+
+          #### Apply the 5 Key Patterns
+
+          The "What Good Looks Like" section lists 5 numbered key patterns. Explain how you'll apply each:
+          1. Key Pattern 1: [Your approach]
+          2. Key Pattern 2: [Your approach]
+          3. Key Pattern 3: [Your approach]
+          4. Key Pattern 4: [Your approach]
+          5. Key Pattern 5: [Your approach]
+
+          #### Plan Your Tests
+
+          Based on the vulnerability:
+          - Positive test (valid input succeeds)
+          - Attack vector tests (exploits blocked)
+          - Edge cases (boundaries, empty input)
+
+          ### Step 3: Post Your Remediation Plan
+
+          Post a comment to issue #${{ steps.issue_details.outputs.issue_number }} with this structure:
+
+          ```markdown
+          ## 🔍 Remediation Plan
+
+          ### 📋 Root Cause Analysis
+
+          [2-3 sentences explaining WHY the vulnerability exists, referencing the OWASP prompt]
+
+          ### 🛡️ Proposed Solution
+
+          **Approach**: [High-level strategy matching "What Good Looks Like" from the prompt]
+
+          **Scope**: This issue contains **[X] occurrence(s)** of the same vulnerability pattern.
+
+          **All Locations to Fix**:
+          - Line(s) [X]: [Brief description of vulnerable code at this location]
+          - Line(s) [Y]: [Brief description of vulnerable code at this location]
+          - Line(s) [Z]: [Brief description of vulnerable code at this location]
+
+          **Architecture**:
+          - File: `path/to/vulnerable.ts`
+            - Location 1 (lines X): Apply all 5 key patterns
+            - Location 2 (lines Y): Apply all 5 key patterns
+            - Location 3 (lines Z): Apply all 5 key patterns
+            - **Common Pattern**: [If all occurrences can use the same helper function/pattern, describe it]
+
+          - File: `path/to/vulnerable.test.ts`
+            - Add attack vector tests for each occurrence
+            - Add edge case tests
+
+          **Five Key Patterns** (from OWASP prompt):
+          1. **[Pattern 1 name]**: [How to apply across all occurrences]
+          2. **[Pattern 2 name]**: [How to apply across all occurrences]
+          3. **[Pattern 3 name]**: [How to apply across all occurrences]
+          4. **[Pattern 4 name]**: [How to apply across all occurrences]
+          5. **[Pattern 5 name]**: [How to apply across all occurrences]
+
+          **Code Examples**:
+
+          \`\`\`typescript
+          // Example showing the fix (before/after snippet for one occurrence)
+          // BEFORE (vulnerable - Line 45):
+          const sql = \`SELECT * FROM users WHERE id = \${userId}\`;
+
+          // AFTER (secure - Line 45):
+          const userIdSchema = z.string().uuid();
+          const validId = userIdSchema.parse(userId);
+          const sql = 'SELECT * FROM users WHERE id = $1';
+          const result = await client.query(sql, [validId]);
+
+          // NOTE: Apply the same pattern to lines 89 and 134
+          \`\`\`
+
+          ### ✅ Security Design Checklist
+
+          Reference: **OWASP [Category]** prompt embedded in issue #${{ steps.issue_details.outputs.issue_number }}
+
+          **Design Decisions** (Checklist items 1-3 from the OWASP prompt):
+
+          - [ ] **[Item 1 name]** — [Your specific design choice with details]
+            - Example: "Parameterized Queries — Use PostgreSQL `pg` library with $1/$2 placeholders for all queries"
+
+          - [ ] **[Item 2 name]** — [Your specific design choice with details]
+            - Example: "Input Validation — Zod schema: `z.string().uuid()` for IDs, `z.string().regex(/^[a-zA-Z0-9]+$/).max(100)` for search terms"
+
+          - [ ] **[Item 3 name]** — [Your specific design choice with details]
+            - Example: "No String Concatenation — All SQL uses parameterized statements, zero template literals containing SQL keywords"
+
+          **Implementation Verification** (Checklist items 4-6):
+          - These will be validated during Phase 2 (implementation) after approval
+
+          ### 🏗️ Maintainability Considerations
+
+          [If maintainability prompts are included in the issue]
+
+          **From [Maintainability Category] prompt**:
+
+          **Design Decisions** (Checklist items 1-3 from maintainability prompt):
+
+          - [ ] **[Item 1]** — [Your approach]
+          - [ ] **[Item 2]** — [Your approach]
+          - [ ] **[Item 3]** — [Your approach]
+
+          ### 🎯 Threat Coverage
+
+          [If STRIDE prompts are included]
+
+          **STRIDE Categories Addressed**:
+          - **[Threat]**: [How your fix prevents this threat]
+
+          ### 🧪 Testing Strategy
+
+          **Test Cases**:
+
+          1. **Positive Test**: Valid input succeeds
+             \`\`\`typescript
+             it('should process valid user ID', async () => {
+               const result = await getUser('550e8400-e29b-41d4-a716-446655440000');
+               expect(result).toBeDefined();
+             });
+             \`\`\`
+
+          2. **Attack Vector Test**: Injection attempt blocked
+             \`\`\`typescript
+             it('should reject SQL injection in user ID', async () => {
+               await expect(getUser("1' OR '1'='1")).rejects.toThrow('Invalid input');
+             });
+             \`\`\`
+
+          3. **Edge Cases**: [Boundary conditions, empty input, special characters]
+
+          **Coverage Target**: ≥90% for modified functions
+
+          ### 📦 Dependencies
+
+          **New dependencies** (if any):
+          - `zod@^3.22.0` — Input validation
+          - `pg@^8.11.0` — PostgreSQL client (if not present)
+
+          ### 👤 Approval Required
+
+          **To approve this plan and trigger implementation, copy and paste this comment:**
+
+          \`\`\`
+          @alice approved
+          \`\`\`
+
+          **Alternative approval commands:**
+          - `@alice go ahead`
+          - `@alice implement this`
+          - `@alice looks good`
+
+          **For changes:** Just comment with your feedback and I'll update the plan.
+
+          I will NOT implement until you explicitly approve.
+
+          ---
+
+          📚 **Reference**: This plan follows patterns from the embedded compact prompt packs in the issue
+          ```
+
+          ### Step 4: Wait for Feedback
+
+          - **DO NOT implement** the fix
+          - **DO NOT create** branches or PRs
+          - **DO NOT edit** any code files
+          - **DO** respond to feedback and iterate on the plan
+
+          ---
+
+          ## Important Guidelines
+
+          ### Using the Embedded Prompts
+
+          1. **The OWASP prompt is your spec** — "What Good Looks Like" shows exactly what secure code should be
+          2. **The 5 Key Patterns are your checklist** — Apply all 5 to your fix
+          3. **The Human Review Checklist items 1-3 are design requirements** — Address each in your plan
+          4. **The vulnerable examples show what to avoid** — Check if current code matches these anti-patterns
+
+          ### Design Quality
+
+          1. **Be specific**: Don't say "add validation" — show the exact Zod schema
+          2. **Show code examples**: Include before/after snippets
+          3. **Reference the prompt**: Say "Following Key Pattern 2 from the embedded A03 prompt..."
+          4. **Address all checklist items 1-3**: Each design decision should map to a checklist item
+
+          ### Iteration is Expected
+
+          - This may take 2-3 rounds of feedback
+          - Update your plan based on feedback
+          - Don't rush to implementation
+
+          ## Tools Available
+
+          ```bash
+          # Read vulnerable code
+          Read <file_path>
+
+          # Search codebase for patterns
+          Grep <pattern> --output_mode content -B 2 -A 2
+
+          # Find related files
+          Glob "**/*.ts"
+
+          # Post your plan
+          gh issue comment ${{ steps.issue_details.outputs.issue_number }} --body "your markdown plan here"
+          ```
+
+          **Start by reading the vulnerable code file mentioned in the issue.**
+
+        claude_args: |
+          --allowedTools "Read,Glob,Grep,Bash(gh issue comment:*)"
+
+    - name: Label issue as planning
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ steps.issue_details.outputs.issue_number }},
+            labels: ['remediation-planning']
+          });
+
+  # ============================================================================
+  # Phase 2: Implementation (Triggered by "approved")
+  # ============================================================================
+  implement-fix:
+    name: "Implementation"
+    runs-on: ubuntu-latest
+    # Trigger: @claude or @alice WITH approval keywords
+    if: |
+      github.event.issue &&
+      (contains(github.event.comment.body, '@claude') || contains(github.event.comment.body, '@alice')) &&
+      (
+        contains(github.event.comment.body, 'approved') ||
+        contains(github.event.comment.body, 'go ahead') ||
+        contains(github.event.comment.body, 'implement this') ||
+        contains(github.event.comment.body, 'looks good')
+      ) &&
+      contains(github.event.issue.labels.*.name, 'codeql-finding')
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Configure Git
+      run: |
+        git config user.name "claude-code[bot]"
+        git config user.email "claude-code[bot]@users.noreply.github.com"
+
+    - name: Extract issue details
+      id: issue_details
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issue = context.payload.issue;
+          const comment = context.payload.comment;
+
+          core.setOutput('issue_number', issue.number);
+          core.setOutput('issue_title', issue.title);
+          core.setOutput('issue_body', issue.body);
+          core.setOutput('comment_body', comment.body);
+          core.setOutput('comment_user', comment.user.login);
+
+    - name: Claude Code Implementation
+      uses: anthropics/claude-code-action@v1
+      with:
+        anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        track_progress: true
+        prompt: |
+          # Security Vulnerability Remediation — Implementation Phase
+
+          ## Context
+
+          - **Repository**: ${{ github.repository }}
+          - **Issue**: #${{ steps.issue_details.outputs.issue_number }}
+          - **Approved by**: @${{ steps.issue_details.outputs.comment_user }}
+
+          ## Issue Details
+
+          ${{ steps.issue_details.outputs.issue_body }}
+
+          ## Approval Comment
+
+          ${{ steps.issue_details.outputs.comment_body }}
+
+          ---
+
+          ## Your Task: Implement the Approved Remediation Plan
+
+          ### Pre-Implementation: Find Your Plan & Extract Context
+
+          1. **Check for multiple occurrences in the issue**
+             - Look for "Occurrences: X locations in this file" in the issue header
+             - Note all line numbers: "Location 1: Lines 45-47", "Location 2: Lines 89-91", etc.
+             - **CRITICAL**: You must fix ALL occurrences, not just one
+
+          2. **Search issue comments** for your previous remediation plan
+             - Look for a comment from `claude-code[bot]` or `alice[bot]`
+             - Contains "## 🔍 Remediation Plan"
+             - Should list "All Locations to Fix" with line numbers
+             - Has design decisions, 5 key patterns, and code examples
+
+          3. **Extract prompt pack categories and checklists from the issue**
+             - OWASP category: Look in issue title or body for "A01", "A02", etc.
+             - **Human Review Checklist**: Expand the OWASP prompt section and find the 6-item checklist
+             - Maintainability: Check for 🏗️ sections (Complexity Reduction, DRY Principle, etc.)
+             - STRIDE threats: Check for 🎯 sections (Tampering, Spoofing, etc.)
+             - You'll need these for the commit message AND the PR Human Review Tasks section
+
+          4. **Verify approval**
+             - Latest comment contains "approved" or similar keyword
+             - Human has reviewed and accepted the plan
+
+          5. **If you can't find your plan**: Post a comment asking for clarification and STOP
+
+          ---
+
+          ### Implementation Steps
+
+          **CRITICAL**: Implement exactly as designed in your approved plan. Do not deviate without posting a comment and getting approval.
+
+          #### Step 1: Create Branch
+
+          ```bash
+          git checkout -b fix/issue-${{ steps.issue_details.outputs.issue_number }}-security
+          ```
+
+          #### Step 2: Implement Security Controls for ALL Occurrences
+
+          Follow your approved plan to implement the fix:
+
+          1. **Read the vulnerable file(s)**
+          2. **For EACH occurrence location** (line numbers from your plan):
+             - Navigate to the specific line
+             - Apply all 5 Key Patterns you proposed
+             - Match your code examples
+          3. **Verify ALL occurrences are fixed**: Use grep or search to ensure you didn't miss any
+             ```bash
+             # Example: Search for any remaining vulnerable patterns
+             grep -n "template literal SQL pattern" path/to/file.ts
+             # Should return 0 matches after your fix
+             ```
+
+          #### Step 3: Validate Implementation Checklist (Items 4-6)
+
+          After implementing, verify checklist items 4-6 from the OWASP/maintainability prompts.
+
+          **Example for OWASP A03 Injection (Items 4-6):**
+
+          - [ ] **Safe APIs & Output Encoding** — Verify no eval(), Function(), or dangerous APIs
+            ```bash
+            grep -r "eval(" src/
+            grep -r "Function(" src/
+            # Should return zero matches in your changes
+            ```
+
+          - [ ] **Error Handling** — Test error messages are generic, no SQL/schema exposure
+            ```bash
+            # Test with invalid input and verify error message
+            # Should return: "Search failed" or similar generic message
+            # Should NOT return: "SQL syntax error near..."
+            ```
+
+          - [ ] **Defense in Depth** — Run tests with attack payloads to verify multiple layers
+            ```bash
+            npm test -- --grep "injection"
+            # All attack vector tests should pass
+            ```
+
+          **Example for Complexity Reduction (Items 4-6):**
+
+          - [ ] **Separation of Concerns** — Verify each function has single responsibility
+          - [ ] **Pattern Application** — Confirm Strategy, Guard Clauses, or other patterns used
+          - [ ] **Behavior Preservation** — All existing tests must pass
+            ```bash
+            npm test
+            # All tests passing ✓
+            ```
+
+          **Example for Tampering (Items 4-6):**
+
+          - [ ] **Transport Security** — Test webhook signatures, TLS verification
+          - [ ] **Database Controls** — Verify least privilege (app user can't UPDATE critical tables)
+          - [ ] **Audit Logging** — Make a change and verify log entry appears
+
+          #### Step 4: Add Comprehensive Tests
+
+          Implement the test strategy from your plan:
+
+          ```typescript
+          describe('Security Fix for Issue #${{ steps.issue_details.outputs.issue_number }}', () => {
+            // Positive test from your plan
+            it('should process valid input', async () => {
+              // Your test here
+            });
+
+            // Attack vector tests from your plan
+            it('should block SQL injection', async () => {
+              // Your test here
+            });
+
+            // Edge cases from your plan
+            it('should handle edge cases', async () => {
+              // Your test here
+            });
+          });
+          ```
+
+          **Run all tests**:
+          ```bash
+          npm test
+          # All tests MUST pass before proceeding
+          ```
+
+          #### Step 5: Verify Code Quality
+
+          ```bash
+          # Lint
+          npm run lint
+
+          # Check complexity if applicable
+          npx ts-complexity src/modified-file.ts
+
+          # Coverage
+          npm test -- --coverage
+          ```
+
+          #### Step 6: Commit & Push
+
+          **IMPORTANT**: Extract the actual categories from the issue to populate the commit message.
+
+          ```bash
+          git add <modified-files>
+
+          # Example commit message format (adjust based on number of occurrences):
+          git commit -m "fix(security): Resolve A03 Injection in api/users.ts (3 occurrences)
+
+          Fixes #${{ steps.issue_details.outputs.issue_number }}
+
+          Fixed 3 instances of SQL injection vulnerability:
+          - Lines 45-47: User query
+          - Lines 89-91: Post query
+          - Lines 134-136: Search query
+
+          Security Controls Applied to All Occurrences:
+          - Parameterized queries with \$1/\$2 placeholders
+          - Input validation with Zod allowlist regex
+          - Generic error messages (no SQL exposure)
+
+          Testing: Positive, negative, and edge case tests included for all occurrences
+
+          🤖 [bot] AI-assisted with Claude Code using MaintainabilityAI prompt packs:
+          - OWASP: A03 Injection
+          - Maintainability: Complexity Reduction, DRY Principle
+          - STRIDE: Tampering
+
+          Co-Authored-By: Claude <noreply@anthropic.com>"
+
+          git push -u origin fix/issue-${{ steps.issue_details.outputs.issue_number }}-security
+          ```
+
+          **Commit message template** (fill in with actual values from the issue):
+          ```
+          fix(security): Resolve [OWASP category name] in [filename]
+
+          Fixes #[issue-number]
+
+          Security Controls:
+          - [Actual control 1 from your implementation]
+          - [Actual control 2 from your implementation]
+          - [Actual control 3 from your implementation]
+
+          Testing: Positive, negative, and edge case tests included
+
+          🤖 [bot] AI-assisted with Claude Code using MaintainabilityAI prompt packs:
+          - OWASP: [A0X Category Name]
+          - Maintainability: [Categories used, comma-separated, or "None" if not applicable]
+          - STRIDE: [Threats addressed, comma-separated, or "None" if not applicable]
+
+          Co-Authored-By: Claude <noreply@anthropic.com>
+          ```
+
+          #### Step 7: Create Pull Request
+
+          **Before creating the PR**, prepare the Human Review Tasks checklist:
+
+          1. **Extract checklist items from the embedded OWASP prompt** in issue #${{ steps.issue_details.outputs.issue_number }}:
+             - Expand the "📘 OWASP Security Guidance" section
+             - Find "Human Review Checklist" (typically 6 items)
+             - Copy the item names (e.g., "Parameterized Queries", "Input Validation", etc.)
+
+          2. **For each checklist item**, create a specific verification task:
+             - Item 1-3 (Design): Describe what to look for in the code
+             - Item 4-6 (Verification): Provide the exact command to run
+
+          3. **Example for OWASP A03 Injection**:
+             ```markdown
+             **Security Checklist** (from OWASP A03 Injection):
+             - [ ] **Parameterized Queries**: Open \`api/users.ts\` lines 45-67 and confirm all queries use \$1/\$2 placeholders
+             - [ ] **Input Validation**: Test endpoint with attack payload \`'; DROP TABLE users--\` and verify 400 error with message "Invalid input"
+             - [ ] **No String Concatenation**: Run \`grep -r "SELECT.*\${" src/\` and verify 0 matches
+             - [ ] **Safe APIs**: Run \`grep -r "eval\\|Function(" src/\` and verify 0 matches
+             - [ ] **Error Handling**: Send invalid UUID and verify error is "Invalid user ID" not SQL error
+             - [ ] **Defense in Depth**: Run \`npm test -- --grep "injection"\` and verify all 5 tests pass
+             ```
+
+          Now create the PR with the populated checklist:
+
+          ```bash
+          gh pr create \
+            --title "[Security] Fix Issue #${{ steps.issue_details.outputs.issue_number }}: ${{ steps.issue_details.outputs.issue_title }}" \
+            --body "## 🔒 Security Fix
+
+          Fixes #${{ steps.issue_details.outputs.issue_number }}
+
+          ### Summary
+          [Brief description from your plan]
+
+          ### Changes
+          - \`file.ts\` — [Description from plan]
+          - \`file.test.ts\` — [Tests added]
+
+          ### Security Controls Implemented
+
+          ✅ **Design Decisions** (Checklist items 1-3):
+          - [Item 1]: [What you implemented]
+          - [Item 2]: [What you implemented]
+          - [Item 3]: [What you implemented]
+
+          ✅ **Implementation Verification** (Checklist items 4-6):
+          - [X] [Item 4]: [How verified]
+          - [X] [Item 5]: [How verified]
+          - [X] [Item 6]: [How verified]
+
+          ### Testing
+          \`\`\`bash
+          npm test
+          # All tests passing ✓
+          \`\`\`
+
+          ### References
+          - Remediation Plan: [link to plan comment]
+          - OWASP Guidance: Embedded in issue #${{ steps.issue_details.outputs.issue_number }}
+
+          ---
+
+          ### 👤 Human Review Tasks
+
+          **IMPORTANT**: Before merging, verify each item below. These are extracted from the embedded prompt pack checklists in Issue #${{ steps.issue_details.outputs.issue_number }}.
+
+          **Security Checklist** (from OWASP prompt):
+          - [ ] **[Item 1 name]**: [Specific verification - e.g., \"Open \`file.ts\` lines X-Y and confirm all queries use \$1/\$2 placeholders\"]
+          - [ ] **[Item 2 name]**: [Specific verification - e.g., \"Test endpoint with attack payload: \'; DROP TABLE users-- and verify 400 error\"]
+          - [ ] **[Item 3 name]**: [Specific verification - e.g., \"Run \`grep -r \\\"SELECT.*\\\${\\\" src/\` and verify 0 matches\"]
+          - [ ] **[Item 4 name]**: [Specific verification - e.g., \"Run \`grep -r \\\"eval\\\\|Function(\\\" src/\` and verify 0 matches\"]
+          - [ ] **[Item 5 name]**: [Specific verification - e.g., \"Send invalid input and verify error is generic, not SQL error\"]
+          - [ ] **[Item 6 name]**: [Specific verification - e.g., \"Run \`npm test -- --grep \\\"injection\\\"\` and verify all tests pass\"]
+
+          **Maintainability Checklist** (if applicable):
+          - [ ] **Complexity**: Run \`npx ts-complexity src/modified-file.ts\` and verify all functions ≤10
+          - [ ] **Test Coverage**: Run \`npm test -- --coverage\` and verify modified files ≥80%
+          - [ ] **Code Duplication**: Review for DRY violations
+
+          **Threat Model Verification** (if applicable):
+          - [ ] **[STRIDE Category]**: [Specific threat mitigation to verify]
+
+          **General Quality Gates**:
+          - [ ] All CI/CD checks passing (CodeQL, Snyk, ESLint)
+          - [ ] No new security vulnerabilities introduced
+          - [ ] All tests passing locally and in CI
+          - [ ] Commit message includes 🤖 AI disclosure
+
+          ---
+
+          🤖 AI-assisted with Claude Code using MaintainabilityAI prompts
+
+          Co-Authored-By: Claude <noreply@anthropic.com>" \
+            --base main \
+            --label "security" \
+            --label "ai-assisted"
+          ```
+
+          #### Step 8: Post Update to Issue
+
+          Get the PR number from the created PR, then:
+
+          ```bash
+          gh issue comment ${{ steps.issue_details.outputs.issue_number }} --body "## ✅ Implementation Complete
+
+          Pull Request: [link to PR]
+
+          ### Implementation Summary
+
+          **Fixed [X] occurrences** of this vulnerability in [filename]:
+          - Lines [X]: [Brief description]
+          - Lines [Y]: [Brief description]
+          - Lines [Z]: [Brief description]
+
+          **All 6 Checklist Items Verified**:
+
+          **Design Phase** (items 1-3):
+          - ✅ [Item 1]: [Implemented across all occurrences]
+          - ✅ [Item 2]: [Implemented across all occurrences]
+          - ✅ [Item 3]: [Implemented across all occurrences]
+
+          **Implementation Phase** (items 4-6):
+          - ✅ [Item 4]: [Verified with: grep/test/etc - checked all locations]
+          - ✅ [Item 5]: [Verified with: test/manual check/etc - all occurrences tested]
+          - ✅ [Item 6]: [Verified with: test/measurement/etc - all instances validated]
+
+          ### Testing Results
+          \`\`\`
+          npm test
+          ✓ All tests passing (including tests for all [X] occurrences)
+          ✓ Coverage: [X]%
+          ✓ Complexity: ≤[target]
+          \`\`\`
+
+          ### Verification Command
+          \`\`\`bash
+          # Verified no remaining vulnerable patterns:
+          grep -n "vulnerable pattern" path/to/file.ts
+          # Returns: 0 matches
+          \`\`\`
+
+          ### Next Steps
+          1. Review PR for code quality (check all [X] locations)
+          2. Verify CI/CD passes
+          3. Merge when approved"
+          ```
+
+          ---
+
+          ### Error Handling
+
+          **If implementation reveals issues with the plan**:
+
+          ```bash
+          gh issue comment ${{ steps.issue_details.outputs.issue_number }} --body "⚠️ **Implementation Issue**
+
+          During implementation I discovered: [issue]
+
+          **Options**:
+          1. [Suggested adjustment]
+          2. [Alternative approach]
+
+          Please advise before proceeding."
+          ```
+
+          **STOP** and wait for guidance. Do not proceed with unapproved changes.
+
+          ---
+
+          ## Important Constraints
+
+          - ✅ **Follow the approved plan exactly**
+          - ✅ **Validate all 6 checklist items** (1-3 from design, 4-6 during implementation)
+          - ✅ **Add comprehensive tests** from your test strategy
+          - ✅ **Run all checks** (tests, lint, complexity)
+          - ✅ **Create PR but DO NOT merge** (human review required)
+          - ❌ **Do not skip tests**
+          - ❌ **Do not implement unapproved changes**
+
+          ## Tools Available
+
+          ```bash
+          # Git operations
+          Bash(git checkout:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*)
+
+          # GitHub CLI
+          Bash(gh pr create:*), Bash(gh issue comment:*)
+
+          # Testing & validation
+          Bash(npm test), Bash(npm run lint), Bash(npx ts-complexity:*), Bash(grep:*)
+
+          # File operations
+          Read, Edit, Write, Glob, Grep
+          ```
+
+          **Start by finding your approved remediation plan in the issue comments.**
+
+        claude_args: |
+          --allowedTools "Bash(git:*),Bash(gh:*),Bash(npm test),Bash(npm run lint),Bash(npx:*),Bash(grep:*),Read,Edit,Write,Glob,Grep"
+
+    - name: Label issue as in-progress
+      if: success()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          // Remove planning labels
+          await github.rest.issues.removeLabel({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ steps.issue_details.outputs.issue_number }},
+            name: 'remediation-planning'
+          }).catch(() => {});
+
+          await github.rest.issues.removeLabel({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ steps.issue_details.outputs.issue_number }},
+            name: 'awaiting-remediation-plan'
+          }).catch(() => {});
+
+          // Add in-progress label
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: ${{ steps.issue_details.outputs.issue_number }},
+            labels: ['remediation-in-progress']
+          });

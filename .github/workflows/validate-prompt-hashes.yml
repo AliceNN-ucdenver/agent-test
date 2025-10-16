@@ -1,0 +1,92 @@
+name: "Validate Prompt Hashes"
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'examples/promptpack/**/*.md'
+      - 'examples/agents/automation/prompt-hashes.json'
+      - 'examples/agents/automation/generate-prompt-hashes.js'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'examples/promptpack/**/*.md'
+      - 'examples/agents/automation/prompt-hashes.json'
+      - 'examples/agents/automation/generate-prompt-hashes.js'
+
+jobs:
+  validate-hashes:
+    name: Validate Prompt Integrity Hashes
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Generate fresh hashes
+      run: node examples/agents/automation/generate-prompt-hashes.js
+
+    - name: Check for hash mismatches
+      run: |
+        if ! git diff --exit-code examples/agents/automation/prompt-hashes.json; then
+          echo ""
+          echo "❌ ERROR: Prompt files changed but hashes were not updated!"
+          echo ""
+          echo "📝 Changes detected:"
+          git diff examples/agents/automation/prompt-hashes.json
+          echo ""
+          echo "🔧 To fix this:"
+          echo "   1. Run: node examples/agents/automation/generate-prompt-hashes.js"
+          echo "   2. Commit the updated prompt-hashes.json"
+          echo "   3. Push the changes"
+          echo ""
+          echo "🔐 This ensures prompt integrity verification works correctly."
+          exit 1
+        else
+          echo "✅ All prompt hashes are up to date!"
+        fi
+
+    - name: Validate hash manifest structure
+      run: |
+        node -e "
+        const hashes = require('./examples/agents/automation/prompt-hashes.json');
+
+        // Validate structure
+        if (!hashes.owasp || !hashes.maintainability || !hashes['threat-modeling']) {
+          console.error('❌ ERROR: Missing required categories in prompt-hashes.json');
+          process.exit(1);
+        }
+
+        // Validate hash format
+        const allHashes = [
+          ...Object.values(hashes.owasp || {}),
+          ...Object.values(hashes.maintainability || {}),
+          ...Object.values(hashes['threat-modeling'] || {})
+        ];
+
+        const invalidHashes = allHashes.filter(h => !h.startsWith('sha256:') || h.length !== 71);
+        if (invalidHashes.length > 0) {
+          console.error('❌ ERROR: Invalid hash format found:', invalidHashes);
+          process.exit(1);
+        }
+
+        console.log('✅ Hash manifest structure is valid');
+        console.log('   Total hashes:', allHashes.length);
+        "
+
+    - name: Summary
+      if: success()
+      run: |
+        echo "## ✅ Prompt Hash Validation Passed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "All prompt files have matching SHA-256 hashes in the manifest." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "This ensures:" >> $GITHUB_STEP_SUMMARY
+        echo "- Prompt integrity is maintained" >> $GITHUB_STEP_SUMMARY
+        echo "- No unauthorized changes to security prompts" >> $GITHUB_STEP_SUMMARY
+        echo "- Safe fetching from remote sources" >> $GITHUB_STEP_SUMMARY

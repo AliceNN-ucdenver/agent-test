@@ -1,0 +1,35 @@
+{
+  "name": "codeql-claude-ai-remediation",
+  "version": "1.0.0",
+  "description": "Complete CodeQL + Claude AI automated security remediation system with OWASP prompts",
+  "main": "automation/process-codeql-results.js",
+  "scripts": {
+    "dev": "cd src && npm run dev",
+    "build": "cd src && npm run build",
+    "install-all": "npm install --no-save @octokit/rest axios && cd src && npm install"
+  },
+  "keywords": [
+    "codeql",
+    "claude-ai",
+    "security",
+    "owasp",
+    "sarif",
+    "github-actions",
+    "automation",
+    "vulnerability-remediation",
+    "maintainability"
+  ],
+  "author": "MaintainabilityAI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AliceNN-ucdenver/MaintainabilityAI"
+  },
+  "peerDependencies": {
+    "@octokit/rest": "^20.0.0",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
