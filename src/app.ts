@@ -10,6 +10,8 @@
 import express from 'express';
 import { Pool } from 'pg';
 import crypto from 'crypto';
+import { z } from 'zod';
+import { loginSchema, searchSchema, userIdSchema, emailSchema } from './validation';
 
 const app = express();
 app.use(express.json());
@@ -19,65 +21,82 @@ const pool = new Pool({
   connectionString: 'postgresql://admin:password123@localhost:5432/mydb'
 });
 
-// A03 - Injection: Vulnerable login endpoint
+// A03 - Injection: FIXED - Parameterized queries with input validation
 app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  // SQL Injection vulnerability - string concatenation
-  const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`;
-
   try {
-    const result = await pool.query(query);
+    // Validate input with Zod schema (allowlist regex)
+    const { username, password } = loginSchema.parse(req.body);
+
+    // Parameterized query - SQL structure separate from data
+    const query = 'SELECT id, username, email, role FROM users WHERE username = $1 AND password = $2';
+    const result = await pool.query(query, [username, password]);
 
     if (result.rows.length > 0) {
-      // A07 - Authentication Failure: No password hashing
+      // A07 - Authentication Failure: No password hashing (separate issue)
       res.json({
         success: true,
-        user: result.rows[0]  // A01: Exposing full user record
+        user: result.rows[0]
       });
     } else {
       res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
   } catch (error) {
-    // A09 - Logging Failure: Exposing sensitive error details
-    res.status(500).json({
-      error: error.message,
-      query: query  // Exposing query structure
-    });
+    // Generic error message - don't expose SQL details
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ success: false, message: 'Invalid input' });
+    } else {
+      console.error('Login error:', error); // Log server-side only
+      res.status(500).json({ success: false, message: 'Operation failed' });
+    }
   }
 });
 
-// A03 - Injection: Vulnerable search endpoint
+// A03 - Injection: FIXED - Parameterized queries with input validation
 app.get('/api/users/search', async (req, res) => {
-  const searchTerm = req.query.q;
-
-  // NoSQL-style injection if using JSON queries
-  const query = `SELECT * FROM users WHERE name LIKE '%${searchTerm}%'`;
-
   try {
-    const result = await pool.query(query);
+    // Validate input with Zod schema (allowlist regex)
+    const { q: searchTerm } = searchSchema.parse(req.query);
+
+    // Parameterized query with LIKE pattern
+    const query = 'SELECT id, username, email FROM users WHERE name ILIKE $1';
+    const result = await pool.query(query, [`%${searchTerm}%`]);
+
     res.json(result.rows);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // Generic error message - don't expose SQL details
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid search term' });
+    } else {
+      console.error('Search error:', error); // Log server-side only
+      res.status(500).json({ error: 'Search failed' });
+    }
   }
 });
 
-// A01 - Broken Access Control: No authorization check
+// A01 - Broken Access Control: No authorization check (separate issue)
+// A03 - Injection: FIXED - Parameterized queries with input validation
 app.get('/api/admin/users/:id', async (req, res) => {
-  const userId = req.params.id;
-
-  // Direct object reference without ownership check
-  const query = `SELECT * FROM users WHERE id = ${userId}`;
-
   try {
-    const result = await pool.query(query);
+    // Validate input with Zod schema
+    const userId = userIdSchema.parse(req.params.id);
+
+    // Parameterized query - SQL structure separate from data
+    const query = 'SELECT id, username, email, role FROM users WHERE id = $1';
+    const result = await pool.query(query, [userId]);
+
     if (result.rows.length > 0) {
       res.json(result.rows[0]);
     } else {
       res.status(404).json({ error: 'User not found' });
     }
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    // Generic error message - don't expose SQL details
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid user ID' });
+    } else {
+      console.error('User fetch error:', error); // Log server-side only
+      res.status(500).json({ error: 'Operation failed' });
+    }
   }
 });
 
@@ -96,22 +115,33 @@ app.post('/api/encrypt', (req, res) => {
   res.json({ hash, encrypted });
 });
 
-// A04 - Insecure Design: Predictable password reset tokens
+// A04 - Insecure Design: Predictable password reset tokens (partially fixed)
+// A03 - Injection: FIXED - Parameterized queries with input validation
 app.post('/api/password-reset', async (req, res) => {
-  const { email } = req.body;
+  try {
+    // Validate input with Zod schema
+    const email = emailSchema.parse(req.body.email);
 
-  // Predictable token based on timestamp
-  const resetToken = Math.floor(Date.now() / 1000).toString();
+    // Generate secure reset token (improved from timestamp)
+    const resetToken = crypto.randomBytes(32).toString('hex');
 
-  // Store in database without expiration
-  await pool.query(
-    `UPDATE users SET reset_token = '${resetToken}' WHERE email = '${email}'`
-  );
+    // Parameterized query - SQL structure separate from data
+    const query = 'UPDATE users SET reset_token = $1, reset_token_expiry = NOW() + INTERVAL \'1 hour\' WHERE email = $2';
+    await pool.query(query, [resetToken, email]);
 
-  res.json({
-    message: 'Reset token sent',
-    token: resetToken  // Exposing token in response
-  });
+    // Don't expose token in response (security improvement)
+    res.json({
+      message: 'If the email exists, a reset link has been sent'
+    });
+  } catch (error) {
+    // Generic error message - don't expose SQL details
+    if (error instanceof z.ZodError) {
+      res.status(400).json({ error: 'Invalid email' });
+    } else {
+      console.error('Password reset error:', error); // Log server-side only
+      res.status(500).json({ error: 'Operation failed' });
+    }
+  }
 });
 
 // A05 - Security Misconfiguration: Overly permissive CORS
