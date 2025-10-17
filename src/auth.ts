@@ -27,22 +27,25 @@ export async function attemptLogin(username: string, password: string) {
   // No account lockout
   // No CAPTCHA after failed attempts
 
-  const hashedPassword = await hashPassword(password);
-
   // A03 - SQL Injection vulnerability
-  const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${hashedPassword}'`;
+  const query = `SELECT * FROM users WHERE username = '${username}'`;
 
   const result = await pool.query(query);
 
   if (result.rows.length > 0) {
-    // A07 - Session management issues: Predictable session IDs
-    const sessionId = `${username}-${Date.now()}`;
+    const user = result.rows[0];
+    const passwordMatch = await comparePasswords(password, user.password);
+    
+    if (passwordMatch) {
+      // A07 - Session management issues: Predictable session IDs
+      const sessionId = `${username}-${Date.now()}`;
 
-    return {
-      success: true,
-      sessionId,
-      user: result.rows[0]
-    };
+      return {
+        success: true,
+        sessionId,
+        user
+      };
+    }
   }
 
   return { success: false };
