@@ -4,22 +4,21 @@
  */
 
 import { Pool } from 'pg';
-import crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/mydb'
 });
 
-// A07 - Authentication Failure: Weak password hashing
+// ✅ Fixed: Using bcrypt for secure password hashing
 export async function hashPassword(password: string): Promise<string> {
-  // Using deprecated SHA1 instead of bcrypt
-  return crypto.createHash('sha1').update(password).digest('hex');
+  const saltRounds = 10;
+  return bcrypt.hash(password, saltRounds);
 }
 
-// A07 - Authentication Failure: Timing attack vulnerability
+// ✅ Fixed: Using bcrypt.compare for timing-safe password comparison
 export async function comparePasswords(input: string, stored: string): Promise<boolean> {
-  // Non-constant time comparison
-  return input === stored;
+  return bcrypt.compare(input, stored);
 }
 
 // A07 - Authentication Failure: No rate limiting
@@ -28,22 +27,25 @@ export async function attemptLogin(username: string, password: string) {
   // No account lockout
   // No CAPTCHA after failed attempts
 
-  const hashedPassword = await hashPassword(password);
-
   // A03 - SQL Injection vulnerability
-  const query = `SELECT * FROM users WHERE username = '${username}' AND password = '${hashedPassword}'`;
+  const query = `SELECT * FROM users WHERE username = '${username}'`;
 
   const result = await pool.query(query);
 
   if (result.rows.length > 0) {
-    // A07 - Session management issues: Predictable session IDs
-    const sessionId = `${username}-${Date.now()}`;
+    const user = result.rows[0];
+    const passwordMatch = await comparePasswords(password, user.password);
+    
+    if (passwordMatch) {
+      // A07 - Session management issues: Predictable session IDs
+      const sessionId = `${username}-${Date.now()}`;
 
-    return {
-      success: true,
-      sessionId,
-      user: result.rows[0]
-    };
+      return {
+        success: true,
+        sessionId,
+        user
+      };
+    }
   }
 
   return { success: false };

@@ -5,6 +5,9 @@ logs/
 # Node modules (if installed locally)
 node_modules/
 
+# Build artifacts
+dist/
+
 # SARIF results (may contain sensitive data)
 results.sarif
 *.sarif
