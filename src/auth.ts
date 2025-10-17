@@ -4,22 +4,21 @@
  */
 
 import { Pool } from 'pg';
-import crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/mydb'
 });
 
-// A07 - Authentication Failure: Weak password hashing
+// ✅ Fixed: Using bcrypt for secure password hashing
 export async function hashPassword(password: string): Promise<string> {
-  // Using deprecated SHA1 instead of bcrypt
-  return crypto.createHash('sha1').update(password).digest('hex');
+  const saltRounds = 10;
+  return bcrypt.hash(password, saltRounds);
 }
 
-// A07 - Authentication Failure: Timing attack vulnerability
+// ✅ Fixed: Using bcrypt.compare for timing-safe password comparison
 export async function comparePasswords(input: string, stored: string): Promise<boolean> {
-  // Non-constant time comparison
-  return input === stored;
+  return bcrypt.compare(input, stored);
 }
 
 // A07 - Authentication Failure: No rate limiting
